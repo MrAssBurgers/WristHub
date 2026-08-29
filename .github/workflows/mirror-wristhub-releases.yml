@@ -1,6 +1,10 @@
 name: Mirror WristHub releases
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/mirror-wristhub-releases.yml"
   schedule:
     - cron: "*/5 * * * *"
   workflow_dispatch:
