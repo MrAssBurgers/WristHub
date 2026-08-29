@@ -1,0 +1,75 @@
+name: Mirror WristHub releases
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: wristhub-release-mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mirror signed WristHub packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://wristhub-api.wristhub.workers.dev/v1/releases"
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+
+          for channel in stable beta dev; do
+            pcvr="$work/manifest-pcvr.json"
+            quest="$work/manifest-quest.json"
+            if ! curl --fail --silent --show-error --retry 3 \
+              "$base/$channel/pcvr/manifest.json" -o "$pcvr"; then
+              continue
+            fi
+            if ! curl --fail --silent --show-error --retry 3 \
+              "$base/$channel/quest/manifest.json" -o "$quest"; then
+              continue
+            fi
+
+            sequence="$(jq -r '.releaseSequence // 0' "$pcvr")"
+            quest_sequence="$(jq -r '.releaseSequence // 0' "$quest")"
+            if [[ "$sequence" == "0" || "$sequence" != "$quest_sequence" ]]; then
+              echo "Skipping $channel: platform manifests are not one universal release yet."
+              continue
+            fi
+
+            tag="wristhub-$channel-$sequence"
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "$tag is already mirrored."
+              continue
+            fi
+
+            download_url="$(jq -r '.downloadUrl' "$pcvr")"
+            archive_name="${download_url##*/}"
+            archive="$work/$archive_name"
+            curl --fail --location --silent --show-error --retry 4 \
+              "$download_url" -o "$archive"
+
+            expected_size="$(jq -r '.sizeBytes' "$pcvr")"
+            actual_size="$(stat -c '%s' "$archive")"
+            expected_hash="$(jq -r '.sha256' "$pcvr" | tr '[:upper:]' '[:lower:]')"
+            actual_hash="$(sha256sum "$archive" | cut -d' ' -f1)"
+            [[ "$actual_size" == "$expected_size" ]]
+            [[ "$actual_hash" == "$expected_hash" ]]
+
+            notes="$work/notes.txt"
+            jq -r '.notes // "WristHub update"' "$pcvr" > "$notes"
+            gh release create "$tag" "$archive" "$pcvr" "$quest" \
+              --title "WristHub $(jq -r '.releaseLabel' "$pcvr")" \
+              --notes-file "$notes" \
+              $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
+          done
+
