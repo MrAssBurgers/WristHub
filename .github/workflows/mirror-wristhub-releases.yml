@@ -57,7 +57,15 @@ jobs:
             fi
 
             download_url="$(jq -r '.downloadUrl' "$pcvr")"
-            archive_name="${download_url##*/}"
+            version="$(jq -r '.version' "$pcvr")"
+            release_label="$(jq -r '.releaseLabel' "$pcvr")"
+            if [[ "$channel" == "stable" ]]; then
+              archive_name="WristHub-v${version}-Official-Release.zip"
+            else
+              build="$(sed -nE 's/.*DEV BUILD ([0-9]+).*/\1/ip' <<<"$release_label")"
+              [[ -n "$build" ]]
+              archive_name="WristHub-v${version}-Dev-Build-${build}.zip"
+            fi
             archive="$work/$archive_name"
             curl --fail --location --silent --show-error --retry 4 \
               "$download_url" -o "$archive"
@@ -77,4 +85,35 @@ jobs:
               $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
           done
 
-# Mirror trigger: Dev Build 186 complete package
+          # GitHub does not provide a rename button for release assets in its normal UI, but its
+          # release API can safely rename the asset without changing its bytes or digest. Backfill
+          # every mirrored WristHub release so old sequence-only names disappear as well.
+          gh release list --limit 100 --json tagName --jq '.[].tagName' | \
+            grep -E '^wristhub-(stable|beta|dev)-[0-9]+$' | while read -r tag; do
+              release_json="$work/release.json"
+              gh api "repos/$GH_REPO/releases/tags/$tag" > "$release_json"
+              manifest_url="$(jq -r '.assets[] | select(.name == "manifest-pcvr.json") | .browser_download_url' "$release_json" | head -n1)"
+              [[ -n "$manifest_url" ]] || continue
+              manifest="$work/backfill-manifest.json"
+              curl --fail --location --silent --show-error --retry 3 "$manifest_url" -o "$manifest"
+
+              version="$(jq -r '.version' "$manifest")"
+              channel="$(cut -d- -f2 <<<"$tag")"
+              if [[ "$channel" == "stable" ]]; then
+                friendly_name="WristHub-v${version}-Official-Release.zip"
+              else
+                build="$(jq -r '.releaseLabel' "$manifest" | sed -nE 's/.*DEV BUILD ([0-9]+).*/\1/ip')"
+                [[ -n "$build" ]] || continue
+                friendly_name="WristHub-v${version}-Dev-Build-${build}.zip"
+              fi
+
+              asset_id="$(jq -r --arg name "$friendly_name" \
+                '[.assets[] | select(.name | endswith(".zip")) | select(.name != $name)][0].id // empty' \
+                "$release_json")"
+              if [[ -n "$asset_id" ]]; then
+                echo "Renaming $tag package to $friendly_name"
+                gh api --method PATCH "repos/$GH_REPO/releases/assets/$asset_id" \
+                  -f name="$friendly_name" >/dev/null
+              fi
+            done
+
