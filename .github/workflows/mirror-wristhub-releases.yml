@@ -83,6 +83,14 @@ jobs:
               --title "WristHub $(jq -r '.releaseLabel' "$pcvr")" \
               --notes-file "$notes" \
               $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
+
+            # Releases created with GitHub's workflow token do not emit another release workflow.
+            # Dispatch the same tag explicitly so the free Discord announcement workflow handles
+            # mirrored builds, while manually published GitHub releases use its normal release hook.
+            dispatch="$work/discord-dispatch.json"
+            jq -n --arg tag "$tag" \
+              '{event_type:"wristhub-release-published",client_payload:{tag:$tag}}' > "$dispatch"
+            gh api --method POST "repos/$GH_REPO/dispatches" --input "$dispatch"
           done
 
           # GitHub does not provide a rename button for release assets in its normal UI, but its
@@ -116,4 +124,3 @@ jobs:
                   -f name="$friendly_name" >/dev/null
               fi
             done
-
