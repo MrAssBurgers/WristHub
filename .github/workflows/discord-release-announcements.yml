@@ -53,10 +53,19 @@ jobs:
             webhook="${DISCORD_NEW_RELEASES_WEBHOOK:-}"
             heading="NEW WRISTHUB RELEASE"
             color=3066993
+            mention="@everyone"
+            allowed_mentions='{"parse":["everyone"]}'
           else
             webhook="${DISCORD_DEV_BUILDS_WEBHOOK:-}"
             heading="NEW WRISTHUB DEV BUILD"
             color=3447003
+            # Discord resolves role pings only from the role snowflake syntax. Keep the role ID
+            # explicit so every dev build reaches the real WristHub Beta Tester role instead of
+            # posting a plain-text @betatesters string that notifies nobody.
+            beta_testers_role_id="1534288973399068843"
+            mention="<@&${beta_testers_role_id}>"
+            allowed_mentions="$(jq -cn --arg role "$beta_testers_role_id" \
+              '{parse:[],roles:[$role]}')"
           fi
 
           if [[ -z "$webhook" ]]; then
@@ -71,8 +80,11 @@ jobs:
             --arg notes "$notes" \
             --arg release_url "$release_url" \
             --arg download_url "$download_url" \
+            --arg mention "$mention" \
+            --argjson allowed_mentions "$allowed_mentions" \
             --argjson color "$color" \
             '{
+              content: $mention,
               username: "WristHub Release Bot",
               embeds: [{
                 title: ($heading + " • " + $title),
@@ -83,7 +95,7 @@ jobs:
                 footer: {text:"Published automatically from the official WristHub GitHub"},
                 timestamp: (now | todateiso8601)
               }],
-              allowed_mentions: {parse: []}
+              allowed_mentions: $allowed_mentions
             }' > "$payload"
 
           curl --fail --silent --show-error --retry 3 \
