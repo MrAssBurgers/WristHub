@@ -49,7 +49,10 @@ jobs:
           download_url="$(jq -r '[.assets[] | select(.name | endswith(".zip"))][0].browser_download_url // .html_url' "$release")"
           prerelease="$(jq -r '.prerelease' "$release")"
 
-          if [[ "$tag" == wristhub-stable-* || "$prerelease" == "false" ]]; then
+          # The WristHub channel encoded in a mirrored tag is authoritative. This prevents a
+          # mistakenly toggled GitHub prerelease checkbox on a dev/beta tag from pinging everyone.
+          if [[ "$tag" == wristhub-stable-* ]] || \
+             [[ "$tag" != wristhub-dev-* && "$tag" != wristhub-beta-* && "$prerelease" == "false" ]]; then
             webhook="${DISCORD_NEW_RELEASES_WEBHOOK:-}"
             heading="NEW WRISTHUB RELEASE"
             color=3066993
