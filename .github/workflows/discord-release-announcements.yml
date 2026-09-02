@@ -22,6 +22,91 @@ concurrency:
 jobs:
   announce:
     runs-on: ubuntu-latest
+    env:
+      # Keep this filter inside the workflow so the public release-only repository does not need
+      # to expose or check out the private WristHub source tree. The service regression test loads
+      # this exact module from the YAML, so the behavior tested below is the behavior Discord runs.
+      WRISTHUB_RELEASE_NOTES_FILTER_SCRIPT: |
+        import { readFileSync, writeFileSync } from "node:fs";
+        import { resolve } from "node:path";
+        import { fileURLToPath } from "node:url";
+
+        const FALLBACK = "WristHub update. Open the release page for the complete player-facing details.";
+        const START_MARKER = "<!-- wristhub-public-notes:start -->";
+        const END_MARKER = "<!-- wristhub-public-notes:end -->";
+        const PRIVATE_HEADING = /^(?:internal(?: notes?)?|developer(?: notes?)?|implementation(?: details?)?|build(?: details?| status| output| chatter)?|ci|pipeline|workflow|verification|test(?:ing| results?)?|diagnostics?|logs?|stack traces?|crash analysis|root cause|third[- ]party(?: issues?| errors?| diagnostics?)?|known external issues?)$/i;
+        const THIRD_PARTY_COMPONENT = /\b(?:modiomodnetworker|mod[ .-]?io mod networker|qb inventory|nicksclient|fusionimpersonator|awesome\s*sauce)\b/i;
+        const THIRD_PARTY_DIAGNOSIS = /(?:\b(?:another|external|third[- ]party)\s+mod\b.*\b(?:error|exception|fault|crash|stack|log)|\b(?:error|exception|fault|crash|stack|log)\b.*\b(?:another|external|third[- ]party)\s+mod\b)/i;
+        const GENERIC_EXTERNAL_FAILURE = /(?:\b[a-z0-9_.-]+(?:mod|plugin|networker)\b.{0,80}\b(?:broken|caused?|crash(?:ed)?|error|exception|failed?|fault|issue|problem|threw)\b|\b(?:broken|caused?|crash(?:ed)?|error|exception|failed?|fault|issue|problem|threw)\b.{0,80}\b[a-z0-9_.-]+(?:mod|plugin|networker)\b)/i;
+        const OWNED_CHANGE_PREFIX = /^(?:fixed|prevents?|protected|worked around|improved|added|restored|updated|wristhub\b)/i;
+        const RAW_DIAGNOSTIC = /^(?:\[(?:error|warn(?:ing)?|fatal|exception)\]|(?:error|warn(?:ing)?|fatal|exception)\s*:|(?:system\.)?[a-z0-9_.]+exception\b|at\s+[a-z0-9_.<>`]+\s*\(|---+\s*(?:end of )?stack trace)/i;
+        const INTERNAL_CHATTER = /(?:^(?:internal|developer note|build log|verification|test results?)\s*:|\b(?:build|compil(?:e|ed|ation)|compiler|tests?|test suite|ci|pipeline|workflow|artifact|manifest|sha-?256|checksum|release sequence|version bump|commit|deployment|publish(?:ing)?|upload)\b.{0,45}\b(?:passed|green|complete(?:d)?|succeed(?:ed)?|failed|generated|verified|validated|uploaded|published|deployed)\b|\b(?:passed|green|complete(?:d)?|succeed(?:ed)?|failed|generated|verified|validated|uploaded|published|deployed)\b.{0,45}\b(?:build|compilation|tests?|ci|pipeline|workflow|artifact|manifest|deployment)\b)/i;
+        const SOURCE_DETAIL = /(?:\b(?:source[- ]level|private method|internal class|stack frame|line number)\b|(?:^|\s)(?:src|tests?|tools|service)[\\/][^\s]+\.(?:cs|js|mjs|ps1)(?=\s|$))/i;
+
+        function headingText(line) {
+          const match = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+          return match ? match[1].replace(/[*_`]/g, "").trim() : "";
+        }
+
+        function isPrivateLine(line) {
+          const plain = line.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+|>\s*)/, "").trim();
+          return !plain || THIRD_PARTY_COMPONENT.test(plain) || THIRD_PARTY_DIAGNOSIS.test(plain) ||
+            (GENERIC_EXTERNAL_FAILURE.test(plain) && !OWNED_CHANGE_PREFIX.test(plain)) ||
+            RAW_DIAGNOSTIC.test(plain) || INTERNAL_CHATTER.test(plain) || SOURCE_DETAIL.test(plain);
+        }
+
+        function bounded(text, maximum) {
+          if (text.length <= maximum) return text;
+          const slice = text.slice(0, Math.max(0, maximum - 1));
+          const boundary = Math.max(slice.lastIndexOf("\n"), slice.lastIndexOf(" "));
+          return `${(boundary > maximum * 0.7 ? slice.slice(0, boundary) : slice).trimEnd()}…`;
+        }
+
+        export function filterDiscordReleaseNotes(value, maximum = 3500) {
+          let text = String(value ?? "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n")
+            .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+          const markerStart = text.indexOf(START_MARKER);
+          if (markerStart >= 0) {
+            const contentStart = markerStart + START_MARKER.length;
+            const markerEnd = text.indexOf(END_MARKER, contentStart);
+            text = text.slice(contentStart, markerEnd >= 0 ? markerEnd : text.length);
+          }
+
+          const output = [];
+          let pendingHeading = "";
+          let privateSection = false;
+          let fenced = false;
+          for (const original of text.split("\n")) {
+            const line = original.replace(/\s+$/, "");
+            if (/^\s*```/.test(line)) { fenced = !fenced; continue; }
+            if (fenced || /^\s*<!--.*-->\s*$/.test(line)) continue;
+            const heading = headingText(line);
+            if (heading) {
+              privateSection = PRIVATE_HEADING.test(heading.trim());
+              pendingHeading = privateSection ? "" : line.trim();
+              continue;
+            }
+            if (privateSection || isPrivateLine(line)) continue;
+            if (pendingHeading) {
+              if (output.length && output.at(-1) !== "") output.push("");
+              output.push(pendingHeading);
+              pendingHeading = "";
+            }
+            if (!line.trim()) {
+              if (output.length && output.at(-1) !== "") output.push("");
+            } else output.push(line.trimEnd());
+          }
+          while (output.at(-1) === "") output.pop();
+          const cleaned = output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+          return bounded(cleaned || FALLBACK, Math.max(80, Math.min(3500, maximum)));
+        }
+
+        if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+          const input = process.argv[2];
+          const output = process.argv[3];
+          if (!input || !output) throw new Error("usage: filter-release-notes input output");
+          writeFileSync(output, filterDiscordReleaseNotes(readFileSync(input, "utf8")), "utf8");
+        }
     steps:
       - name: Post the release to the matching Discord channel
         env:
@@ -44,7 +129,13 @@ jobs:
           gh api "repos/$GH_REPO/releases/tags/$tag" > "$release"
 
           title="$(jq -r '.name // .tag_name' "$release")"
-          notes="$(jq -r '.body // "WristHub update"' "$release" | head -c 3500)"
+          raw_notes="$work/raw-notes.txt"
+          filtered_notes="$work/discord-notes.txt"
+          filter_script="$work/filter-release-notes.mjs"
+          jq -r '.body // "WristHub update"' "$release" > "$raw_notes"
+          printf '%s\n' "$WRISTHUB_RELEASE_NOTES_FILTER_SCRIPT" > "$filter_script"
+          node "$filter_script" "$raw_notes" "$filtered_notes"
+          notes="$(<"$filtered_notes")"
           release_url="$(jq -r '.html_url' "$release")"
           download_url="$(jq -r '[.assets[] | select(.name | endswith(".zip"))][0].browser_download_url // .html_url' "$release")"
           prerelease="$(jq -r '.prerelease' "$release")"
