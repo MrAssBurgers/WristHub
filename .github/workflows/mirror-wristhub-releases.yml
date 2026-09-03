@@ -2,7 +2,7 @@ name: Mirror WristHub releases
 
 on:
   # A workflow-file sync also wakes the mirror immediately when GitHub's schedule is delayed.
-  # Latest manual publish wake: Dev Build 217 (440217).
+  # Latest manual publish wake: Dev Build 218 (440218).
   push:
     branches: [main]
     paths:
