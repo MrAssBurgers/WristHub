@@ -107,3 +107,10 @@ This is WristHub's official public download and update repository. Releases are 
 <p align="center">
   Made with care for the BONELAB community by <strong>MrAssBurgers</strong>.
 </p>
+
+## Help and bug reports
+
+- **[Get WristHub help](https://github.com/MrAssBurgers/WristHub/issues/new?template=help_request.yml)** for installation, updating, or usage questions.
+- **[Report a WristHub bug](https://github.com/MrAssBurgers/WristHub/issues/new?template=bug_report.yml)** and include your device, exact build, reproduction steps, log, and any useful media.
+
+Please remove passwords, tokens, and personal information before uploading logs.
