@@ -1,0 +1,76 @@
+name: WristHub bug report
+description: Report a WristHub problem on PCVR or Quest Standalone
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve WristHub. Please include the exact build and a log when possible.
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      description: Where did the problem happen?
+      options:
+        - PCVR
+        - Quest Standalone
+        - Both PCVR and Quest
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: WristHub build
+      description: Enter the full release or Dev Build number shown in WristHub.
+      placeholder: Dev Build 240
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+      placeholder: Tell us exactly what broke and what was happening when it broke.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the shortest steps that make the problem happen again.
+      placeholder: |
+        1. Open WristHub
+        2. Select ...
+        3. The problem appears
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: Drag the latest MelonLoader log here, or paste the relevant WristHub lines. Remove passwords, tokens, and personal information.
+      placeholder: Drag and drop the log file here.
+  - type: textarea
+    id: media
+    attributes:
+      label: Screenshot or video
+      description: Drag screenshots or short videos here if they show the problem.
+      placeholder: Drag and drop media here.
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other installed mods or plugins
+      description: List anything that could interact with WristHub, Fusion, spawning, hands, audio, or networking.
+      placeholder: List names and versions, or write none.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I tested on the latest available WristHub build.
+          required: true
+        - label: I removed secrets and personal information from uploaded logs.
+          required: true
+
