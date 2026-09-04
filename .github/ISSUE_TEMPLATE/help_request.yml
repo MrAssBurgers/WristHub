@@ -1,0 +1,57 @@
+name: WristHub help
+description: Get help installing, updating, or using WristHub
+title: "[Help]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Need help with WristHub? Fill this out and include the exact build shown in the watch.
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device
+      options:
+        - PCVR
+        - Quest Standalone
+        - Both PCVR and Quest
+    validations:
+           required: true
+  - type: input
+    id: build
+    attributes:
+      label: WristHub build
+      placeholder: Dev Build 240 or Official Release version
+    validations:
+      required: true
+  - type: dropdown
+    id: topic
+    attributes:
+      label: What do you need help with?
+      options:
+        - Installing WristHub
+        - Auto updater
+        - Fusion or portals
+        - Friends or calls
+        - Avatars or spawner
+        - Soundboard
+        - Abilities
+        - Something else
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: How can we help?
+      description: Explain what you are trying to do and where you get stuck.
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you already tried?
+      placeholder: List any reinstall, restart, update, or settings steps you tried.
+  - type: textarea
+    id: log
+    attributes:
+      label: Log or screenshot
+      description: Drag in a log or screenshot if it helps. Remove passwords, tokens, and personal information.
