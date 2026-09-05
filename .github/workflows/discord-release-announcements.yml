@@ -13,7 +13,10 @@ on:
         type: string
 
 permissions:
-  contents: read
+  # The workflow appends one invisible per-tag receipt to the release body after Discord accepts
+  # the webhook. That durable receipt makes release, mirror, and manual recovery triggers converge
+  # on exactly one announcement.
+  contents: write
 
 concurrency:
   group: discord-release-${{ github.event.release.tag_name || github.event.client_payload.tag || inputs.tag }}
@@ -121,12 +124,63 @@ jobs:
         run: |
           set -euo pipefail
           tag="${EVENT_TAG:-${DISPATCH_TAG:-${MANUAL_TAG:-}}}"
-          [[ -n "$tag" ]]
+          [[ "$tag" =~ ^wristhub-(stable|beta|dev)-[0-9]+$ ]]
 
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
           release="$work/release.json"
           gh api "repos/$GH_REPO/releases/tags/$tag" > "$release"
+
+          [[ "$(jq -r '.draft' "$release")" == "false" ]]
+          announcement_marker="<!-- wristhub-discord-announced:${tag} -->"
+          claim_marker="<!-- wristhub-discord-claim:${tag} -->"
+          release_body="$(jq -r '.body // ""' "$release")"
+          if [[ "$release_body" == *"$announcement_marker"* || "$release_body" == *"$claim_marker"* ]]; then
+            echo "Discord announcement already claimed or recorded for $tag; skipping duplicate trigger."
+            exit 0
+          fi
+
+          # Never announce a release shell. The archive and both signed platform manifests must be
+          # uniquely present, fully uploaded, non-empty, mutually consistent, and tied to this tag.
+          archive_count="$(jq '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded" and .size > 0)] | length' "$release")"
+          pcvr_count="$(jq '[.assets[] | select(.name == "manifest-pcvr.json" and .state == "uploaded" and .size > 0)] | length' "$release")"
+          quest_count="$(jq '[.assets[] | select(.name == "manifest-quest.json" and .state == "uploaded" and .size > 0)] | length' "$release")"
+          if [[ "$archive_count" != "1" || "$pcvr_count" != "1" || "$quest_count" != "1" ]]; then
+            echo "Release $tag is not complete; Discord was not notified." >&2
+            exit 1
+          fi
+
+          zip_url="$(jq -r '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded")][0].browser_download_url' "$release")"
+          zip_size="$(jq -r '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded")][0].size' "$release")"
+          zip_digest="$(jq -r '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded")][0].digest // ""' "$release" | tr '[:upper:]' '[:lower:]')"
+          pcvr_url="$(jq -r '.assets[] | select(.name == "manifest-pcvr.json") | .browser_download_url' "$release")"
+          quest_url="$(jq -r '.assets[] | select(.name == "manifest-quest.json") | .browser_download_url' "$release")"
+          pcvr_manifest="$work/manifest-pcvr.json"
+          quest_manifest="$work/manifest-quest.json"
+          curl --fail --location --silent --show-error --retry 3 "$pcvr_url" -o "$pcvr_manifest"
+          curl --fail --location --silent --show-error --retry 3 "$quest_url" -o "$quest_manifest"
+
+          jq -e '.schemaVersion == 1 and .platform == "pcvr" and .releaseSequence > 0 and
+            (.sha256 | test("^[0-9a-fA-F]{64}$")) and .sizeBytes > 0 and
+            (.downloadUrl | startswith("https://"))' "$pcvr_manifest" >/dev/null
+          jq -e '.schemaVersion == 1 and .platform == "quest" and .releaseSequence > 0 and
+            (.sha256 | test("^[0-9a-fA-F]{64}$")) and .sizeBytes > 0 and
+            (.downloadUrl | startswith("https://"))' "$quest_manifest" >/dev/null
+
+          sequence="$(jq -r '.releaseSequence' "$pcvr_manifest")"
+          channel="$(jq -r '.channel' "$pcvr_manifest")"
+          manifest_hash="$(jq -r '.sha256' "$pcvr_manifest" | tr '[:upper:]' '[:lower:]')"
+          manifest_size="$(jq -r '.sizeBytes' "$pcvr_manifest")"
+          manifest_url="$(jq -r '.downloadUrl' "$pcvr_manifest")"
+          [[ "$(jq -r '.releaseSequence' "$quest_manifest")" == "$sequence" ]]
+          [[ "$(jq -r '.channel' "$quest_manifest")" == "$channel" ]]
+          [[ "$(jq -r '.sha256' "$quest_manifest" | tr '[:upper:]' '[:lower:]')" == "$manifest_hash" ]]
+          [[ "$(jq -r '.sizeBytes' "$quest_manifest")" == "$manifest_size" ]]
+          [[ "$(jq -r '.downloadUrl' "$quest_manifest")" == "$manifest_url" ]]
+          [[ "$tag" == "wristhub-${channel}-${sequence}" ]]
+          [[ "$zip_size" == "$manifest_size" ]]
+          [[ "$zip_digest" == "sha256:${manifest_hash}" ]]
+          [[ "$zip_url" == "$manifest_url" ]]
 
           title="$(jq -r '.name // .tag_name' "$release")"
           raw_notes="$work/raw-notes.txt"
@@ -137,7 +191,7 @@ jobs:
           node "$filter_script" "$raw_notes" "$filtered_notes"
           notes="$(<"$filtered_notes")"
           release_url="$(jq -r '.html_url' "$release")"
-          download_url="$(jq -r '[.assets[] | select(.name | endswith(".zip"))][0].browser_download_url // .html_url' "$release")"
+          download_url="$zip_url"
           prerelease="$(jq -r '.prerelease' "$release")"
 
           # The WristHub channel encoded in a mirrored tag is authoritative. This prevents a
@@ -192,9 +246,47 @@ jobs:
               allowed_mentions: $allowed_mentions
             }' > "$payload"
 
-          curl --fail --silent --show-error --retry 3 \
+          # Claim this tag durably before the non-idempotent Discord POST. If the runner is lost
+          # after Discord accepts the message, every later trigger sees the claim and cannot post a
+          # duplicate. An operator can remove a stranded hidden claim to deliberately retry.
+          if [[ -n "$release_body" ]]; then
+            claimed_body="${release_body%$'\n'}"$'\n\n'"$claim_marker"
+          else
+            claimed_body="$claim_marker"
+          fi
+          claim_patch="$work/announcement-claim.json"
+          jq -n --arg body "$claimed_body" '{body:$body}' > "$claim_patch"
+          gh api --method PATCH "repos/$GH_REPO/releases/$(jq -r '.id' "$release")" \
+            --input "$claim_patch" >/dev/null
+          confirmed_claim="$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.body // ""')"
+          [[ "$confirmed_claim" == *"$claim_marker"* ]]
+
+          # A webhook POST is deliberately attempted once. Retrying an ambiguous response can make
+          # Discord accept the same announcement twice even though this runner saw a network error.
+          discord_response="$work/discord-response.json"
+          curl --fail --silent --show-error \
             -H "Content-Type: application/json" \
             --data-binary "@$payload" \
-            "${webhook}?wait=true" >/dev/null
-          echo "Discord announcement posted for $tag."
+            "${webhook}?wait=true" > "$discord_response"
+          discord_message_id="$(jq -r '.id // empty' "$discord_response")"
+          [[ "$discord_message_id" =~ ^[0-9]+$ ]]
 
+          # Promote CLAIMED to POSTED only after Discord returns its message ID. If this GitHub edit
+          # fails, the claim intentionally remains and still enforces at-most-once delivery.
+          updated_body="${claimed_body//$claim_marker/$announcement_marker}"
+          updated_body="$updated_body"$'\n'"<!-- wristhub-discord-message:${tag}:${discord_message_id} -->"
+          marker_patch="$work/announcement-marker.json"
+          jq -n --arg body "$updated_body" '{body:$body}' > "$marker_patch"
+          marked=false
+          for attempt in 1 2 3 4 5; do
+            if gh api --method PATCH "repos/$GH_REPO/releases/$(jq -r '.id' "$release")" \
+              --input "$marker_patch" >/dev/null; then
+              marked=true
+              break
+            fi
+            sleep "$attempt"
+          done
+          [[ "$marked" == "true" ]]
+          confirmed_body="$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.body // ""')"
+          [[ "$confirmed_body" == *"$announcement_marker"* ]]
+          echo "Discord announcement posted once and recorded for $tag as message $discord_message_id."
