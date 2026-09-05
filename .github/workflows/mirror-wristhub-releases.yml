@@ -2,7 +2,7 @@ name: Mirror WristHub releases
 
 on:
   # A workflow-file sync also wakes the mirror immediately when GitHub's schedule is delayed.
-  # Latest manual publish wake: Dev Build 224 (440224).
+  # Latest manual publish wake: Dev Build 240 (440240).
   push:
     branches: [main]
     paths:
@@ -33,6 +33,14 @@ jobs:
           work="$(mktemp -d)"
           trap 'rm -rf "$work"' EXIT
 
+          dispatch_discord() {
+            local tag="$1"
+            local dispatch="$work/discord-dispatch.json"
+            jq -n --arg tag "$tag" \
+              '{event_type:"wristhub-release-published",client_payload:{tag:$tag}}' > "$dispatch"
+            gh api --method POST "repos/$GH_REPO/dispatches" --input "$dispatch"
+          }
+
           for channel in stable beta dev; do
             pcvr="$work/manifest-pcvr.json"
             quest="$work/manifest-quest.json"
@@ -53,9 +61,24 @@ jobs:
             fi
 
             tag="wristhub-$channel-$sequence"
-            if gh release view "$tag" >/dev/null 2>&1; then
-              echo "$tag is already mirrored."
-              continue
+            existing_release="$work/existing-$channel.json"
+            release_exists=false
+            if gh api "repos/$GH_REPO/releases/tags/$tag" > "$existing_release" 2>/dev/null; then
+              release_exists=true
+              if [[ "$(jq -r '.draft' "$existing_release")" == "false" ]]; then
+                marker="<!-- wristhub-discord-announced:${tag} -->"
+                body="$(jq -r '.body // ""' "$existing_release")"
+                if [[ "$body" != *"$marker"* ]]; then
+                  # Recover a rare failed announcement. The Discord workflow owns the durable
+                  # per-tag receipt and its concurrency group safely collapses simultaneous retries.
+                  dispatch_discord "$tag"
+                  echo "$tag is complete; queued its missing Discord receipt."
+                else
+                  echo "$tag is already mirrored and announced."
+                fi
+                continue
+              fi
+              echo "Resuming incomplete draft $tag."
             fi
 
             download_url="$(jq -r '.downloadUrl' "$pcvr")"
@@ -81,18 +104,37 @@ jobs:
 
             notes="$work/notes.txt"
             jq -r '.notes // "WristHub update"' "$pcvr" > "$notes"
-            gh release create "$tag" "$archive" "$pcvr" "$quest" \
-              --title "WristHub $(jq -r '.releaseLabel' "$pcvr")" \
-              --notes-file "$notes" \
-              $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
+            if [[ "$release_exists" == "false" ]]; then
+              # Keep the release private until every byte is uploaded and verified. Publishing the
+              # empty shell would let users and announcement jobs race incomplete assets.
+              gh release create "$tag" --draft \
+                --title "WristHub $(jq -r '.releaseLabel' "$pcvr")" \
+                --notes-file "$notes" \
+                $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
+            else
+              gh release edit "$tag" --draft=true \
+                --title "WristHub $(jq -r '.releaseLabel' "$pcvr")" \
+                --notes-file "$notes" \
+                $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
+            fi
+            gh release upload "$tag" "$archive" "$pcvr" "$quest" --clobber
+
+            complete_release="$work/complete-$channel.json"
+            gh api "repos/$GH_REPO/releases/tags/$tag" > "$complete_release"
+            archive_count="$(jq '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded" and .size > 0)] | length' "$complete_release")"
+            pcvr_count="$(jq '[.assets[] | select(.name == "manifest-pcvr.json" and .state == "uploaded" and .size > 0)] | length' "$complete_release")"
+            quest_count="$(jq '[.assets[] | select(.name == "manifest-quest.json" and .state == "uploaded" and .size > 0)] | length' "$complete_release")"
+            uploaded_size="$(jq -r '[.assets[] | select(.name | endswith(".zip"))][0].size // 0' "$complete_release")"
+            uploaded_digest="$(jq -r '[.assets[] | select(.name | endswith(".zip"))][0].digest // ""' "$complete_release" | tr '[:upper:]' '[:lower:]')"
+            [[ "$archive_count" == "1" && "$pcvr_count" == "1" && "$quest_count" == "1" ]]
+            [[ "$uploaded_size" == "$expected_size" ]]
+            [[ "$uploaded_digest" == "sha256:${expected_hash}" ]]
+
+            gh release edit "$tag" --draft=false >/dev/null
 
             # Releases created with GitHub's workflow token do not emit another release workflow.
-            # Dispatch the same tag explicitly so the free Discord announcement workflow handles
-            # mirrored builds, while manually published GitHub releases use its normal release hook.
-            dispatch="$work/discord-dispatch.json"
-            jq -n --arg tag "$tag" \
-              '{event_type:"wristhub-release-published",client_payload:{tag:$tag}}' > "$dispatch"
-            gh api --method POST "repos/$GH_REPO/dispatches" --input "$dispatch"
+            # Dispatch only after the draft has all three verified assets and is public.
+            dispatch_discord "$tag"
           done
 
           # GitHub does not provide a rename button for release assets in its normal UI, but its
@@ -126,4 +168,3 @@ jobs:
                   -f name="$friendly_name" >/dev/null
               fi
             done
-
