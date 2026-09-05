@@ -1,15 +1,15 @@
-name: Mirror WristHub releases
+name: Legacy Cloudflare release mirror
 
 on:
-  # A workflow-file sync also wakes the mirror immediately when GitHub's schedule is delayed.
-  # Latest manual publish wake: Dev Build 240 (440240).
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/mirror-wristhub-releases.yml"
-  schedule:
-    - cron: "*/5 * * * *"
+  # GitHub-direct publishing is authoritative. This workflow is retained only for an operator to
+  # recover one legacy Cloudflare release during the final migration; it never polls automatically.
   workflow_dispatch:
+    inputs:
+      confirm_legacy_mirror:
+        description: Mirror one pending legacy Cloudflare release into GitHub
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -20,6 +20,7 @@ concurrency:
 
 jobs:
   mirror:
+    if: ${{ inputs.confirm_legacy_mirror == true }}
     runs-on: ubuntu-latest
     steps:
       - name: Mirror signed WristHub packages

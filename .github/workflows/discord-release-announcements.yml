@@ -48,34 +48,299 @@ jobs:
         const OWNED_CHANGE_PREFIX = /^(?:fixed|prevents?|protected|worked around|improved|added|restored|updated|wristhub\b)/i;
         const RAW_DIAGNOSTIC = /^(?:\[(?:error|warn(?:ing)?|fatal|exception)\]|(?:error|warn(?:ing)?|fatal|exception)\s*:|(?:system\.)?[a-z0-9_.]+exception\b|at\s+[a-z0-9_.<>`]+\s*\(|---+\s*(?:end of )?stack trace)/i;
         const INTERNAL_CHATTER = /(?:^(?:internal|developer note|build log|verification|test results?)\s*:|\b(?:build|compil(?:e|ed|ation)|compiler|tests?|test suite|ci|pipeline|workflow|artifact|manifest|sha-?256|checksum|release sequence|version bump|commit|deployment|publish(?:ing)?|upload)\b.{0,45}\b(?:passed|green|complete(?:d)?|succeed(?:ed)?|failed|generated|verified|validated|uploaded|published|deployed)\b|\b(?:passed|green|complete(?:d)?|succeed(?:ed)?|failed|generated|verified|validated|uploaded|published|deployed)\b.{0,45}\b(?:build|compilation|tests?|ci|pipeline|workflow|artifact|manifest|deployment)\b)/i;
-        const SOURCE_DETAIL-y��!j�-���jם�X�\��X��۝��[YN�X\K\�\�[W�H�HW��]]�\�
-��NB��]]�\�
-[�K��[Q[�
+        const SOURCE_DETAIL = /(?:\b(?:source[- ]level|private method|internal class|stack frame|line number)\b|(?:^|\s)(?:src|tests?|tools|service)[\\/][^\s]+\.(?:cs|js|mjs|ps1)(?=\s|$))/i;
 
-JNB��[H
-�]]�]
-LJHOOH��H�]]��
+        function headingText(line) {
+          const match = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*#*\s*$/);
+          return match ? match[1].replace(/[*_`]/g, "").trim() : "";
+        }
 
-N�ۜ��X[�YH�]]���[����K��\X�J����K������K��[J
-N�ۜ�[Z]HX]�X^
-X]�Z[��LX^[][JJN�ۜ��[[X\�HH�X[�Y�S�P���ۜ��[X\�U\�H\���X�\�Y��\���Y�T�[X\�U\�
-�XY[ܙU\�
-H���Y�
-�[X\�U\�
-H�ۜ��XY[ܙHH
-���XY[ܙN�����[�H�[�[��[��J	ܙ[X\�U\�JX�ۜ��[[X\�P�Y�]H[Z]H�XY[ܙK�[��H�Y�
-�[[X\�P�Y�]�H�
-B��]\��	؛�[�Y
-�[[X\�K�[[X\�P�Y�]
-_W��ܙXY[ܙ_XB��]\����[�Y
-�[[X\�K[Z]
-NB��Y�
-���\�˘\�ݖ�WH	���\���J���\�˘\�ݖ�WJHOOH�[UT��]
-[\ܝ�Y]K�\�
-JH�ۜ�[�]H���\�˘\�ݖ̗N�ۜ��]]H���\�˘\�ݖ��N�ۜ��XY[ܙU\�H���\�˘\�ݖ�H��Y�
-Z[�][�]]
-H����]�\��܊�\�Y�N��[\�\�[X\�K[��\�[�]�]]ܙ[X\�K]\�H�Nܚ]Q�[T�[���]]��[\�\��ܙ�[X\�S��\��XY�[T�[��[�]�]��K�L�XY[ܙU\�
-K�]��NB��\Έ�[YN���H�[X\�H�HX]�[��\��ܙ�[��[�[��������S��	���]X����[�_B��ԑTΈ	���]X���\��]ܞH_B�T��ԑ�U�ЕRS���P���Έ	���Xܙ]ˑT��ԑ�U�ЕRS���P����_B�T��ԑӑU�ԑSPT�T���P���Έ	���Xܙ]ˑT��ԑӑU�ԑSPTݻ��܅�춻�q�^u}4���ձ��p��ɽ�����ɽ�����̈����Ѡ�t��ѥ����Ј���������(��������������Ёɕ����A�Ѡ�􀈽ѵ���ɥ�ѡՈ�ɕ���I5�����(��������������Ёɕ����	�ѕ̀�ՙ���Q�U%����Ʌ䡅݅�Ёɕ������ɕ����A�Ѡ���(������������Ёɕ������ѕ�������ȹ�������ɕ����	�ѕ̤�ɕ�������q�q������q����(��������������Ё�х��5�ɭ�Ȁ�������ɥ�ѡՈ�ɕ���͕���х�Ѐ�����(��������������Ё���5�ɭ�Ȁ�������ɥ�ѡՈ�ɕ���͕�镹�������(��������������Ё͕�ѥ����l(���������������
-���������I����͔����ݹ��������(��������������贵�贵�贵���(���������������ɕ���͕̹������х��������������������Uɰ������(����������������퍡�����������������ɕ�������q𽜰��qqqp�����m�Ёi%At�����Uɱ���񀤰(����������t�������q����(��������������Ёɕ��������Ѐ􁀑��х��5�ɭ���q���͕�ѥ���q��핹�5�ɭ�����(��������������Ё���Ѐ�ɕ���������Ց�̡�х��5�ɭ�Ȥ����ɕ���������Ց�̡���5�ɭ�Ȥ(��������������ɕ�����ɕ��������܁I�����(�������������������͍���I������х��5�ɭ�ȥ�mqq�qqMt����͍���I��������5�ɭ�ȥ�����ɕ��������Ф(������������聀��ɕ�����ɕ�������q̨��������q�q�����ݹ�����q�q���ɕ����������q���(�����������������Ѐ���ɕ�������݅�Ё�ɥѕ����ɕ����A�Ѡ�����������Ф��(����������ɕ��ɸ��ɕ���͕́��(���������((����������Ё쁑���9����а����5�ɝ�
-�������̰�ɕ��������ɥѕ������݅��(����������ѡՈ�ɕ�й��й��э�������}���ձ��p���ѡՉ�����쉵��ձ�̈�l�������ᕍ�ѽȉt����͕�ɰ�艡����輽��ѡՈ��������ѥ����Ј���������(�������݅�Ёɕ������쁙���A�Ѡ聅��A�Ѡ�����I5����������э������9����Ф�(�������݅�Ё�ɥѕ����쁙���A�Ѡ聅��A�Ѡ�����I5��������ф�ɕ��������(�������������5�ɝ�
-�������̤�����Р����ɽɥ���]ɥ��!Ո�ɕ���͕́�ɽ����!Ո���(�������
+        function isPrivateLine(line) {
+          const plain = line.replace(/^\s*(?:[-*+]\s+|\d+[.)]\s+|>\s*)/, "").trim();
+          return !plain || THIRD_PARTY_COMPONENT.test(plain) || THIRD_PARTY_DIAGNOSIS.test(plain) ||
+            (GENERIC_EXTERNAL_FAILURE.test(plain) && !OWNED_CHANGE_PREFIX.test(plain)) ||
+            RAW_DIAGNOSTIC.test(plain) || INTERNAL_CHATTER.test(plain) || SOURCE_DETAIL.test(plain);
+        }
+
+        function bounded(text, maximum) {
+          if (text.length <= maximum) return text;
+          const slice = text.slice(0, Math.max(0, maximum - 1));
+          const boundary = Math.max(slice.lastIndexOf("\n"), slice.lastIndexOf(" "));
+          return `${(boundary > maximum * 0.7 ? slice.slice(0, boundary) : slice).trimEnd()}…`;
+        }
+
+        function markedSection(text, startMarker, endMarker) {
+          const start = text.indexOf(startMarker);
+          if (start < 0) return null;
+          const contentStart = start + startMarker.length;
+          const end = text.indexOf(endMarker, contentStart);
+          return end < 0 ? null : text.slice(contentStart, end);
+        }
+
+        function safeReleaseUrl(value) {
+          try {
+            const url = new URL(String(value ?? "").trim());
+            return url.protocol === "https:" && url.hostname === "github.com" ? url.href : "";
+          }
+          catch { return ""; }
+        }
+
+        export function filterDiscordReleaseNotes(value, maximum = 3500, readMoreUrl = "") {
+          let text = String(value ?? "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n")
+            .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "");
+          const markerStart = text.indexOf(START_MARKER);
+          if (markerStart >= 0) {
+            const contentStart = markerStart + START_MARKER.length;
+            const markerEnd = text.indexOf(END_MARKER, contentStart);
+            text = text.slice(contentStart, markerEnd >= 0 ? markerEnd : text.length);
+          }
+
+          // New releases carry a short conversational watch note and a separate simplified
+          // changelog. Discord shows only the short explanation and links to GitHub's completed
+          // release for the full list. If either marker is absent, preserve the legacy cleaner.
+          const watchNotes = markedSection(text, WATCH_START_MARKER, WATCH_END_MARKER);
+          const fullChangelog = markedSection(text, CHANGELOG_START_MARKER, CHANGELOG_END_MARKER);
+          const hasStructuredNotes = watchNotes !== null && fullChangelog !== null;
+          if (hasStructuredNotes) text = watchNotes;
+
+          const output = [];
+          let pendingHeading = "";
+          let privateSection = false;
+          let fenced = false;
+          for (const original of text.split("\n")) {
+            const line = original.replace(/\s+$/, "");
+            if (/^\s*```/.test(line)) { fenced = !fenced; continue; }
+            if (fenced || /^\s*<!--.*-->\s*$/.test(line) ||
+                /^\s*<\/?(?:details|summary)(?:\s[^>]*)?>.*$/i.test(line)) continue;
+            const heading = headingText(line);
+            if (heading) {
+              privateSection = PRIVATE_HEADING.test(heading.trim());
+              pendingHeading = privateSection ? "" : line.trim();
+              continue;
+            }
+            if (privateSection) continue;
+            if (!line.trim()) {
+              if (output.length && output.at(-1) !== "") output.push("");
+              continue;
+            }
+            if (isPrivateLine(line)) continue;
+            if (pendingHeading) {
+              if (output.length && output.at(-1) !== "") output.push("");
+              output.push(pendingHeading);
+              pendingHeading = "";
+            }
+            output.push(line.trimEnd());
+          }
+          while (output.at(-1) === "") output.pop();
+          const cleaned = output.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+          const limit = Math.max(80, Math.min(3500, maximum));
+          const summary = cleaned || FALLBACK;
+          const releaseUrl = hasStructuredNotes ? safeReleaseUrl(readMoreUrl) : "";
+          if (releaseUrl) {
+            const readMore = `**Read more:** [Open the full changelog](${releaseUrl})`;
+            const summaryBudget = limit - readMore.length - 2;
+            if (summaryBudget >= 20)
+              return `${bounded(summary, summaryBudget)}\n\n${readMore}`;
+          }
+          return bounded(summary, limit);
+        }
+
+        if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+          const input = process.argv[2];
+          const output = process.argv[3];
+          const readMoreUrl = process.argv[4] || "";
+          if (!input || !output) throw new Error("usage: filter-release-notes input output [release-url]");
+          writeFileSync(output,
+            filterDiscordReleaseNotes(readFileSync(input, "utf8"), 3500, readMoreUrl), "utf8");
+        }
+    steps:
+      - name: Post the release to the matching Discord channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          DISCORD_DEV_BUILDS_WEBHOOK: ${{ secrets.DISCORD_DEV_BUILDS_WEBHOOK }}
+          DISCORD_NEW_RELEASES_WEBHOOK: ${{ secrets.DISCORD_NEW_RELEASES_WEBHOOK }}
+          EVENT_TAG: ${{ github.event.release.tag_name }}
+          DISPATCH_TAG: ${{ github.event.client_payload.tag }}
+          MANUAL_TAG: ${{ inputs.tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${EVENT_TAG:-${DISPATCH_TAG:-${MANUAL_TAG:-}}}"
+          [[ "$tag" =~ ^wristhub-(stable|beta|dev)-[0-9]+$ ]]
+
+          work="$(mktemp -d)"
+          trap 'rm -rf "$work"' EXIT
+          release="$work/release.json"
+          gh api "repos/$GH_REPO/releases/tags/$tag" > "$release"
+
+          [[ "$(jq -r '.draft' "$release")" == "false" ]]
+          announcement_marker="<!-- wristhub-discord-announced:${tag} -->"
+          claim_marker="<!-- wristhub-discord-claim:${tag} -->"
+          release_body="$(jq -r '.body // ""' "$release")"
+          if [[ "$release_body" == *"$announcement_marker"* || "$release_body" == *"$claim_marker"* ]]; then
+            echo "Discord announcement already claimed or recorded for $tag; skipping duplicate trigger."
+            exit 0
+          fi
+
+          # Never announce a release shell. The archive and both signed platform manifests must be
+          # uniquely present, fully uploaded, non-empty, mutually consistent, and tied to this tag.
+          archive_count="$(jq '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded" and .size > 0)] | length' "$release")"
+          pcvr_count="$(jq '[.assets[] | select(.name == "manifest-pcvr.json" and .state == "uploaded" and .size > 0)] | length' "$release")"
+          quest_count="$(jq '[.assets[] | select(.name == "manifest-quest.json" and .state == "uploaded" and .size > 0)] | length' "$release")"
+          if [[ "$archive_count" != "1" || "$pcvr_count" != "1" || "$quest_count" != "1" ]]; then
+            echo "Release $tag is not complete; Discord was not notified." >&2
+            exit 1
+          fi
+
+          zip_url="$(jq -r '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded")][0].browser_download_url' "$release")"
+          zip_size="$(jq -r '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded")][0].size' "$release")"
+          zip_digest="$(jq -r '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded")][0].digest // ""' "$release" | tr '[:upper:]' '[:lower:]')"
+          pcvr_url="$(jq -r '.assets[] | select(.name == "manifest-pcvr.json") | .browser_download_url' "$release")"
+          quest_url="$(jq -r '.assets[] | select(.name == "manifest-quest.json") | .browser_download_url' "$release")"
+          pcvr_manifest="$work/manifest-pcvr.json"
+          quest_manifest="$work/manifest-quest.json"
+          curl --fail --location --silent --show-error --retry 3 "$pcvr_url" -o "$pcvr_manifest"
+          curl --fail --location --silent --show-error --retry 3 "$quest_url" -o "$quest_manifest"
+
+          jq -e '.schemaVersion == 1 and .platform == "pcvr" and .releaseSequence > 0 and
+            (.sha256 | test("^[0-9a-fA-F]{64}$")) and .sizeBytes > 0 and
+            (.downloadUrl | startswith("https://"))' "$pcvr_manifest" >/dev/null
+          jq -e '.schemaVersion == 1 and .platform == "quest" and .releaseSequence > 0 and
+            (.sha256 | test("^[0-9a-fA-F]{64}$")) and .sizeBytes > 0 and
+            (.downloadUrl | startswith("https://"))' "$quest_manifest" >/dev/null
+
+          sequence="$(jq -r '.releaseSequence' "$pcvr_manifest")"
+          channel="$(jq -r '.channel' "$pcvr_manifest")"
+          manifest_hash="$(jq -r '.sha256' "$pcvr_manifest" | tr '[:upper:]' '[:lower:]')"
+          manifest_size="$(jq -r '.sizeBytes' "$pcvr_manifest")"
+          [[ "$(jq -r '.releaseSequence' "$quest_manifest")" == "$sequence" ]]
+          [[ "$(jq -r '.channel' "$quest_manifest")" == "$channel" ]]
+          [[ "$(jq -r '.sha256' "$quest_manifest" | tr '[:upper:]' '[:lower:]')" == "$manifest_hash" ]]
+          [[ "$(jq -r '.sizeBytes' "$quest_manifest")" == "$manifest_size" ]]
+          [[ "$tag" == "wristhub-${channel}-${sequence}" ]]
+          [[ "$zip_size" == "$manifest_size" ]]
+          [[ "$zip_digest" == "sha256:${manifest_hash}" ]]
+
+          # Signed manifests may use the free WristHub service as their primary download while
+          # listing this exact GitHub asset as a mirror. Require the release asset URL to appear
+          # exactly as either the primary URL or one mirrors entry in each platform manifest.
+          # Substrings and same-host lookalikes never pass this check.
+          manifest_points_to_archive() {
+            local manifest="$1"
+            jq -e --arg archive_url "$zip_url" '
+              (.downloadUrl == $archive_url) or
+              ((.mirrors // []) | any(. == $archive_url))
+            ' "$manifest" >/dev/null
+          }
+          manifest_points_to_archive "$pcvr_manifest"
+          manifest_points_to_archive "$quest_manifest"
+
+          title="$(jq -r '.name // .tag_name' "$release")"
+          raw_notes="$work/raw-notes.txt"
+          filtered_notes="$work/discord-notes.txt"
+          filter_script="$work/filter-release-notes.mjs"
+          release_url="$(jq -r '.html_url' "$release")"
+          jq -r '.body // "WristHub update"' "$release" > "$raw_notes"
+          printf '%s\n' "$WRISTHUB_RELEASE_NOTES_FILTER_SCRIPT" > "$filter_script"
+          node "$filter_script" "$raw_notes" "$filtered_notes" "$release_url"
+          notes="$(<"$filtered_notes")"
+          download_url="$zip_url"
+          prerelease="$(jq -r '.prerelease' "$release")"
+
+          # The WristHub channel encoded in a mirrored tag is authoritative. This prevents a
+          # mistakenly toggled GitHub prerelease checkbox on a dev/beta tag from pinging everyone.
+          if [[ "$tag" == wristhub-stable-* ]] || \
+             [[ "$tag" != wristhub-dev-* && "$tag" != wristhub-beta-* && "$prerelease" == "false" ]]; then
+            webhook="${DISCORD_NEW_RELEASES_WEBHOOK:-}"
+            heading="NEW WRISTHUB RELEASE"
+            color=3066993
+            mention="@everyone"
+            allowed_mentions='{"parse":["everyone"]}'
+          else
+            webhook="${DISCORD_DEV_BUILDS_WEBHOOK:-}"
+            heading="NEW WRISTHUB DEV BUILD"
+            color=3447003
+            # Discord resolves role pings only from the role snowflake syntax. Keep the role ID
+            # explicit so every dev build reaches the real WristHub Beta Tester role instead of
+            # posting a plain-text @betatesters string that notifies nobody.
+            beta_testers_role_id="1534288973399068843"
+            mention="<@&${beta_testers_role_id}>"
+            allowed_mentions="$(jq -cn --arg role "$beta_testers_role_id" \
+              '{parse:[],roles:[$role]}')"
+          fi
+
+          if [[ -z "$webhook" ]]; then
+            echo "The matching Discord webhook secret is not configured; the GitHub release remains published."
+            exit 0
+          fi
+
+          payload="$work/discord.json"
+          jq -n \
+            --arg heading "$heading" \
+            --arg title "$title" \
+            --arg notes "$notes" \
+            --arg release_url "$release_url" \
+            --arg download_url "$download_url" \
+            --arg mention "$mention" \
+            --argjson allowed_mentions "$allowed_mentions" \
+            --argjson color "$color" \
+            '{
+              content: $mention,
+              username: "WristHub Release Bot",
+              embeds: [{
+                title: ($heading + " • " + $title),
+                url: $release_url,
+                description: $notes,
+                color: $color,
+                fields: [{name:"Download",value:("[Get the complete WristHub package](" + $download_url + ")")}],
+                footer: {text:"Published automatically from the official WristHub GitHub"},
+                timestamp: (now | todateiso8601)
+              }],
+              allowed_mentions: $allowed_mentions
+            }' > "$payload"
+
+          # Claim this tag durably before the non-idempotent Discord POST. If the runner is lost
+          # after Discord accepts the message, every later trigger sees the claim and cannot post a
+          # duplicate. An operator can remove a stranded hidden claim to deliberately retry.
+          if [[ -n "$release_body" ]]; then
+            claimed_body="${release_body%$'\n'}"$'\n\n'"$claim_marker"
+          else
+            claimed_body="$claim_marker"
+          fi
+          claim_patch="$work/announcement-claim.json"
+          jq -n --arg body "$claimed_body" '{body:$body}' > "$claim_patch"
+          gh api --method PATCH "repos/$GH_REPO/releases/$(jq -r '.id' "$release")" \
+            --input "$claim_patch" >/dev/null
+          confirmed_claim="$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.body // ""')"
+          [[ "$confirmed_claim" == *"$claim_marker"* ]]
+
+          # A webhook POST is deliberately attempted once. Retrying an ambiguous response can make
+          # Discord accept the same announcement twice even though this runner saw a network error.
+          discord_response="$work/discord-response.json"
+          curl --fail --silent --show-error \
+            -H "Content-Type: application/json" \
+            --data-binary "@$payload" \
+            "${webhook}?wait=true" > "$discord_response"
+          discord_message_id="$(jq -r '.id // empty' "$discord_response")"
+          [[ "$discord_message_id" =~ ^[0-9]+$ ]]
+
+          # Promote CLAIMED to POSTED only after Discord returns its message ID. If this GitHub edit
+          # fails, the claim intentionally remains and still enforces at-most-once delivery.
+          updated_body="${claimed_body//$claim_marker/$announcement_marker}"
+          updated_body="$updated_body"$'\n'"<!-- wristhub-discord-message:${tag}:${discord_message_id} -->"
+          marker_patch="$work/announcement-marker.json"
+          jq -n --arg body "$updated_body" '{body:$body}' > "$marker_patch"
+          marked=false
+          for attempt in 1 2 3 4 5; do
+            if gh api --method PATCH "repos/$GH_REPO/releases/$(jq -r '.id' "$release")" \
+              --input "$marker_patch" >/dev/null; then
+              marked=true
+              break
+            fi
+            sleep "$attempt"
+          done
+          [[ "$marked" == "true" ]]
+          confirmed_body="$(gh api "repos/$GH_REPO/releases/tags/$tag" --jq '.body // ""')"
+          [[ "$confirmed_body" == *"$announcement_marker"* ]]
+          echo "Discord announcement posted once and recorded for $tag as message $discord_message_id."
