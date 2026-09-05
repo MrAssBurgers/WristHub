@@ -171,16 +171,27 @@ jobs:
           channel="$(jq -r '.channel' "$pcvr_manifest")"
           manifest_hash="$(jq -r '.sha256' "$pcvr_manifest" | tr '[:upper:]' '[:lower:]')"
           manifest_size="$(jq -r '.sizeBytes' "$pcvr_manifest")"
-          manifest_url="$(jq -r '.downloadUrl' "$pcvr_manifest")"
           [[ "$(jq -r '.releaseSequence' "$quest_manifest")" == "$sequence" ]]
           [[ "$(jq -r '.channel' "$quest_manifest")" == "$channel" ]]
           [[ "$(jq -r '.sha256' "$quest_manifest" | tr '[:upper:]' '[:lower:]')" == "$manifest_hash" ]]
           [[ "$(jq -r '.sizeBytes' "$quest_manifest")" == "$manifest_size" ]]
-          [[ "$(jq -r '.downloadUrl' "$quest_manifest")" == "$manifest_url" ]]
           [[ "$tag" == "wristhub-${channel}-${sequence}" ]]
           [[ "$zip_size" == "$manifest_size" ]]
           [[ "$zip_digest" == "sha256:${manifest_hash}" ]]
-          [[ "$zip_url" == "$manifest_url" ]]
+
+          # Signed manifests may use the free WristHub service as their primary download while
+          # listing this exact GitHub asset as a mirror. Require the release asset URL to appear
+          # exactly as either the primary URL or one mirrors entry in each platform manifest.
+          # Substrings and same-host lookalikes never pass this check.
+          manifest_points_to_archive() {
+            local manifest="$1"
+            jq -e --arg archive_url "$zip_url" '
+              (.downloadUrl == $archive_url) or
+              ((.mirrors // []) | any(. == $archive_url))
+            ' "$manifest" >/dev/null
+          }
+          manifest_points_to_archive "$pcvr_manifest"
+          manifest_points_to_archive "$quest_manifest"
 
           title="$(jq -r '.name // .tag_name' "$release")"
           raw_notes="$work/raw-notes.txt"
