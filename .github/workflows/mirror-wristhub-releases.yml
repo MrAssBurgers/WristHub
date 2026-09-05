@@ -41,6 +41,29 @@ jobs:
             gh api --method POST "repos/$GH_REPO/dispatches" --input "$dispatch"
           }
 
+          find_release_including_drafts() {
+            local tag="$1"
+            local destination="$2"
+            local listing="$work/releases-for-lookup.json"
+            local matches
+
+            # GET /releases/tags/{tag} intentionally excludes drafts. List every authenticated
+            # release page instead, then select the exact tag so an interrupted draft is resumed.
+            gh api --paginate "repos/$GH_REPO/releases?per_page=100" > "$listing"
+            matches="$(jq -s --arg tag "$tag" \
+              '[.[][] | select(.tag_name == $tag)] | length' "$listing")"
+            if [[ "$matches" == "0" ]]; then
+              rm -f "$destination"
+              return 1
+            fi
+            if [[ "$matches" != "1" ]]; then
+              echo "Refusing to mirror $tag: found $matches releases with that exact tag." >&2
+              return 2
+            fi
+            jq -s --arg tag "$tag" \
+              '[.[][] | select(.tag_name == $tag)][0]' "$listing" > "$destination"
+          }
+
           for channel in stable beta dev; do
             pcvr="$work/manifest-pcvr.json"
             quest="$work/manifest-quest.json"
@@ -63,7 +86,9 @@ jobs:
             tag="wristhub-$channel-$sequence"
             existing_release="$work/existing-$channel.json"
             release_exists=false
-            if gh api "repos/$GH_REPO/releases/tags/$tag" > "$existing_release" 2>/dev/null; then
+            lookup_status=0
+            find_release_including_drafts "$tag" "$existing_release" || lookup_status=$?
+            if [[ "$lookup_status" == "0" ]]; then
               release_exists=true
               if [[ "$(jq -r '.draft' "$existing_release")" == "false" ]]; then
                 marker="<!-- wristhub-discord-announced:${tag} -->"
@@ -79,6 +104,8 @@ jobs:
                 continue
               fi
               echo "Resuming incomplete draft $tag."
+            elif [[ "$lookup_status" != "1" ]]; then
+              exit "$lookup_status"
             fi
 
             download_url="$(jq -r '.downloadUrl' "$pcvr")"
@@ -104,23 +131,40 @@ jobs:
 
             notes="$work/notes.txt"
             jq -r '.notes // "WristHub update"' "$pcvr" > "$notes"
+            release_title="WristHub $(jq -r '.releaseLabel' "$pcvr")"
+            prerelease=false
+            [[ "$channel" == "stable" ]] || prerelease=true
             if [[ "$release_exists" == "false" ]]; then
               # Keep the release private until every byte is uploaded and verified. Publishing the
               # empty shell would let users and announcement jobs race incomplete assets.
-              gh release create "$tag" --draft \
-                --title "WristHub $(jq -r '.releaseLabel' "$pcvr")" \
-                --notes-file "$notes" \
-                $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
+              create_payload="$work/create-$channel.json"
+              jq -n --arg tag "$tag" --arg name "$release_title" --rawfile body "$notes" \
+                --argjson prerelease "$prerelease" \
+                '{tag_name:$tag,name:$name,body:$body,draft:true,prerelease:$prerelease}' \
+                > "$create_payload"
+              gh api --method POST "repos/$GH_REPO/releases" --input "$create_payload" \
+                > "$existing_release"
             else
-              gh release edit "$tag" --draft=true \
-                --title "WristHub $(jq -r '.releaseLabel' "$pcvr")" \
-                --notes-file "$notes" \
-                $( [[ "$channel" == "stable" ]] || printf '%s' '--prerelease' )
+              release_id="$(jq -r '.id' "$existing_release")"
+              draft_payload="$work/update-draft-$channel.json"
+              jq -n --arg name "$release_title" --rawfile body "$notes" \
+                --argjson prerelease "$prerelease" \
+                '{name:$name,body:$body,draft:true,prerelease:$prerelease}' \
+                > "$draft_payload"
+              gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
+                --input "$draft_payload" > "$existing_release"
             fi
+            release_id="$(jq -r '.id' "$existing_release")"
+            [[ "$release_id" =~ ^[0-9]+$ ]]
+            [[ "$(jq -r '.tag_name' "$existing_release")" == "$tag" ]]
+            [[ "$(jq -r '.draft' "$existing_release")" == "true" ]]
             gh release upload "$tag" "$archive" "$pcvr" "$quest" --clobber
 
             complete_release="$work/complete-$channel.json"
-            gh api "repos/$GH_REPO/releases/tags/$tag" > "$complete_release"
+            gh api "repos/$GH_REPO/releases/$release_id" > "$complete_release"
+            [[ "$(jq -r '.id' "$complete_release")" == "$release_id" ]]
+            [[ "$(jq -r '.tag_name' "$complete_release")" == "$tag" ]]
+            [[ "$(jq -r '.draft' "$complete_release")" == "true" ]]
             archive_count="$(jq '[.assets[] | select((.name | endswith(".zip")) and .state == "uploaded" and .size > 0)] | length' "$complete_release")"
             pcvr_count="$(jq '[.assets[] | select(.name == "manifest-pcvr.json" and .state == "uploaded" and .size > 0)] | length' "$complete_release")"
             quest_count="$(jq '[.assets[] | select(.name == "manifest-quest.json" and .state == "uploaded" and .size > 0)] | length' "$complete_release")"
@@ -130,7 +174,14 @@ jobs:
             [[ "$uploaded_size" == "$expected_size" ]]
             [[ "$uploaded_digest" == "sha256:${expected_hash}" ]]
 
-            gh release edit "$tag" --draft=false >/dev/null
+            publish_payload="$work/publish-$channel.json"
+            printf '%s\n' '{"draft":false}' > "$publish_payload"
+            published_release="$work/published-$channel.json"
+            gh api --method PATCH "repos/$GH_REPO/releases/$release_id" \
+              --input "$publish_payload" > "$published_release"
+            [[ "$(jq -r '.id' "$published_release")" == "$release_id" ]]
+            [[ "$(jq -r '.tag_name' "$published_release")" == "$tag" ]]
+            [[ "$(jq -r '.draft' "$published_release")" == "false" ]]
 
             # Releases created with GitHub's workflow token do not emit another release workflow.
             # Dispatch only after the draft has all three verified assets and is public.
