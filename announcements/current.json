@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "id": "owner-inactive-1788729212702",
+  "id": "owner-inactive-1788729236452",
   "issuer": "MrAssBurgers",
   "title": "No active event",
   "message": "There is no active WristHub owner event right now.",
   "serverCode": "",
-  "issuedAtUnixSeconds": 1788729212,
-  "expiresAtUnixSeconds": 1788815612,
-  "sequence": 1788729212702,
+  "issuedAtUnixSeconds": 1788729236,
+  "expiresAtUnixSeconds": 1788815636,
+  "sequence": 1788729236452,
   "active": false,
-  "signature": "cGfqFs5f3X2272lzwZ6wkXqO/3kAWuo9wWV9Iq7bQHhyCsz3i56YqkbNoW5irHZo0RaitMvI0uzG0IsRAE9/wXuc1eDsinn32xoKMhhtTMFc/n7bYzIPvLA5+HaLxOxtumfjeFBvLM0mipGmIj4+x35KIl5rl7wCeJylTtx4YJK6gECpystz3uNDRrnjdHHLeNQEUt/4FMIqBjktzPrQypbcnboELk+yroQ1C5AJm8DlG68bWhUYp/JmEQETdD/xjtTVoz+ZqEghjorM66h1gGIiv/JPXJCvPXtay+6rlr4TvmHpFftOEMym/JzYEYYq17Qx7dMfiX7mIOCBhcdWzNqj09SoxRlIJKVhJ5Y+xgP6gI1NMKXerXBQ6U9dcbRE6cLM4RcXhhfcVLVLvJnpQI2Vw5qqN032epwBWhtkNsq6MZ3V69AHPL5bdPxaNPJw8W8holREfvyDrG9bbDsqt1XKsxQGGebhaXzMpP2LQr7glj6265wFzWjfwBrQYRVq"
-}`n
+  "signature": "fyBlK9+r2sKp3wRjcNnCCF+7Sq50VljLkkFAtYH7AI5YmJRd9EQ/rSTPf6UfLeo8VmJed1uOpWzVip9BytZfU6UtzG6CVr3ETeHoYHRpWSuKinKfqgp9N8DWK6Su9kJgaZcAzqcpN/NXqvHQ8iSMQpcb3nLy7ggFSojFkcEsq80xSVQjUXA8xj8Dfk3WWF8JVjIe+jvIb40UDZJL+Do69aIjCkb4f8gHaM3wQgR2/Lv0unlClTVajhyQGqp2Zx6qn0/uyWPqmse72S8D5wqTOLrMk/NyMXdLsAEwDCKCNqIkDI9vND6GlEGfJFJnTGxqFBsD7kxSeNwp9QmU8d1PPaSAA/yGY4XyzoNnP0BRJ/FHQJej9bPne/4zpOtuPh9L3Awwig2oqn2FcSi+s/cn65Aki762hW+Yn4Ye98/jqRWLBOD7LdMlNDYMbdbuqF0kqwgNF+oJCmIfVDHXyaRk5agC9CyHr925Do6CilJH561avuCKDucUMLtbOsmfy7tB"
+}
