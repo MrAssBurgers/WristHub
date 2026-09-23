@@ -41,6 +41,8 @@ jobs:
         const WATCH_END_MARKER = "<!-- wristhub-watch-notes:end -->";
         const CHANGELOG_START_MARKER = "<!-- wristhub-changelog-notes:start -->";
         const CHANGELOG_END_MARKER = "<!-- wristhub-changelog-notes:end -->";
+        const DISCORD_START_MARKER = "<!-- wristhub-discord-notes:start -->";
+        const DISCORD_END_MARKER = "<!-- wristhub-discord-notes:end -->";
         const PRIVATE_HEADING = /^(?:internal(?: notes?)?|developer(?: notes?)?|implementation(?: details?)?|build(?: details?| status| output| chatter)?|ci|pipeline|workflow|verification|test(?:ing| results?)?|diagnostics?|logs?|stack traces?|crash analysis|root cause|third[- ]party(?: issues?| errors?| diagnostics?)?|known external issues?)$/i;
         const THIRD_PARTY_COMPONENT = /\b(?:modiomodnetworker|mod[ .-]?io mod networker|qb inventory|nicksclient|fusionimpersonator|awesome\s*sauce)\b/i;
         const THIRD_PARTY_DIAGNOSIS = /(?:\b(?:another|external|third[- ]party)\s+mod\b.*\b(?:error|exception|fault|crash|stack|log)|\b(?:error|exception|fault|crash|stack|log)\b.*\b(?:another|external|third[- ]party)\s+mod\b)/i;
@@ -98,10 +100,13 @@ jobs:
           // New releases carry a short conversational watch note and a separate simplified
           // changelog. Discord shows only the short explanation and links to GitHub's completed
           // release for the full list. If either marker is absent, preserve the legacy cleaner.
+          const discordNotes = markedSection(text, DISCORD_START_MARKER, DISCORD_END_MARKER);
           const watchNotes = markedSection(text, WATCH_START_MARKER, WATCH_END_MARKER);
           const fullChangelog = markedSection(text, CHANGELOG_START_MARKER, CHANGELOG_END_MARKER);
-          const hasStructuredNotes = watchNotes !== null && fullChangelog !== null;
-          if (hasStructuredNotes) text = watchNotes;
+          const hasStructuredNotes = discordNotes !== null ||
+            (watchNotes !== null && fullChangelog !== null);
+          if (discordNotes !== null) text = discordNotes;
+          else if (hasStructuredNotes) text = watchNotes;
 
           const output = [];
           let pendingHeading = "";
