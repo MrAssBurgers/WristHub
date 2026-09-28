@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   announce:
+    if: startsWith(github.event.release.tag_name || github.event.client_payload.tag || inputs.tag, 'wristhub-stable-') || startsWith(github.event.release.tag_name || github.event.client_payload.tag || inputs.tag, 'wristhub-beta-') || startsWith(github.event.release.tag_name || github.event.client_payload.tag || inputs.tag, 'wristhub-dev-')
     runs-on: ubuntu-latest
     env:
       # Keep this filter inside the workflow so the public release-only repository does not need
