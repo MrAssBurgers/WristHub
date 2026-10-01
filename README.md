@@ -33,6 +33,10 @@
 
 > **New users should choose Full Release.** Dev Builds are for testing and can update frequently.
 
+The Full Release includes the Abilities page and signed automatic updates. The separate Thunderstore edition omits both. If you installed that edition and want Abilities back, close BONELAB, remove or disable the Thunderstore package, then install the Full Release. Do not load both editions together. Pro features are separate and still require a Pro entitlement.
+
+You can also find the full-version download and help in the [WristHub Discord](https://discord.gg/AccsbW9D3H), or use the [shared Google Drive folder](https://drive.google.com/drive/folders/1RLW7Kk68-JMyyZ7colcEdClmmzQF_G6F?usp=drive_link). Check a Drive copy's version before installing it; the GitHub Full Release above is the official update source.
+
 Every release ZIP contains the newest universal WristHub runtime, the standalone automatic updater, the public SDK DLL, a complete sample app, and player/developer tutorials.
 
 ### Guides
@@ -63,7 +67,7 @@ Some features depend on the installed platform, BONELAB/Fusion version, network 
 
 ## Universal build
 
-There is only **one WristHub package**. It detects whether the player is using PCVR or Quest and loads the correct platform support automatically.
+The **Full Release uses one universal package**. It detects whether the player is using PCVR or Quest and loads the correct platform support automatically. The Thunderstore edition is a separate package with fewer features.
 
 - No separate PCVR package
 - No separate Quest package
@@ -73,7 +77,7 @@ There is only **one WristHub package**. It detects whether the player is using P
 
 ## Installation
 
-1. Download a WristHub release ZIP and close BONELAB.
+1. Download the Full Release ZIP and close BONELAB. Remove or disable the Thunderstore edition if you used it before.
 2. Copy all three DLLs from `Mods` into `BONELAB/Mods`.
 3. Copy `Plugins/WristHubUpdater.dll` into `BONELAB/Plugins`.
 4. Launch BONELAB and confirm the green **WristHub Updater is online** startup message.
